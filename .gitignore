@@ -135,6 +135,9 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Generated Keycloak client JSONs (contain secrets, regenerated on each install)
+overrides/keycloak/keycloak-client-*.json
+
 # Environments
 .env
 .envrc
