@@ -1,26 +1,102 @@
 #!/bin/bash
 set -e
 
-FLAVOR=${1:-default}
-HTTPS_MODE=$2
-
-if [ -z "$HTTPS_MODE" ]; then
-  echo "Uso: ./sigic_install.sh <sabor> [http|https|externalhttps]"
-  echo "El valor de <sabor> debe corresponder a un archivo JSON en sigic-modos/ (ej: default.json)"
-  exit 1
-fi
-
-FLAVOR_FILE="sigic-mixins/$FLAVOR.json"
-
-if [ ! -f "$FLAVOR_FILE" ]; then
-  echo "No existe flavor: $FLAVOR_FILE"
-  exit 1
-fi
-
-echo "🔥 Usando flavor: $FLAVOR"
+ARG1=${1:-default}
+ARG2=$2
 
 # =========================
-# 🔹 HTTPS runtime (definitivo)
+# 🔹 detectar modo: platform o flavor clásico
+# =========================
+
+if [ -d "platforms/$ARG1" ]; then
+  # --- modo platform: ./sigic_install.sh <platform> <environment> ---
+  PLATFORM=$ARG1
+  ENVIRONMENT=$ARG2
+
+  if [ -z "$ENVIRONMENT" ]; then
+    echo "Uso: ./sigic_install.sh <platform> <environment>"
+    echo "  platform:     carpeta en platforms/ (ej: idegeo, conafor, sedema)"
+    echo "  environment:  dev | qa | prd"
+    exit 1
+  fi
+
+  PLATFORM_FILE="platforms/$PLATFORM/platform.json"
+  ENV_FILE="platforms/$PLATFORM/env/$ENVIRONMENT.env"
+
+  if [ ! -f "$PLATFORM_FILE" ]; then
+    echo "No existe: $PLATFORM_FILE"
+    exit 1
+  fi
+
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "No existe: $ENV_FILE"
+    echo "Environments disponibles: $(ls platforms/$PLATFORM/env/ 2>/dev/null | sed 's/\.env//' | tr '\n' ' ')"
+    exit 1
+  fi
+
+  BASE_FLAVOR=$(jq -r '.extends' "$PLATFORM_FILE")
+  FLAVOR_FILE="sigic-mixins/$BASE_FLAVOR.json"
+
+  if [ ! -f "$FLAVOR_FILE" ]; then
+    echo "El platform '$PLATFORM' extiende '$BASE_FLAVOR' pero no existe: $FLAVOR_FILE"
+    exit 1
+  fi
+
+  echo "Platform: $PLATFORM | Environment: $ENVIRONMENT | Base flavor: $BASE_FLAVOR"
+
+  # leer env file (hostname, env_type, oidc_provider_url, https_mode)
+  while IFS='=' read -r key value; do
+    [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+    key=$(echo "$key" | xargs)
+    value=$(echo "$value" | xargs)
+    case "$key" in
+      hostname)          HOSTNAME="$value" ;;
+      env_type)          ENV_TYPE="$value" ;;
+      oidc_provider_url) OIDC_URL="$value" ;;
+      https_mode)        HTTPS_MODE="$value" ;;
+    esac
+  done < "$ENV_FILE"
+
+  # email y homepath: platform.json overrides > flavor base
+  EMAIL=$(jq -r '.overrides.email // empty' "$PLATFORM_FILE")
+  [ -z "$EMAIL" ] && EMAIL=$(jq -r '.email // empty' "$FLAVOR_FILE")
+
+  HOMEPATH=$(jq -r '.overrides.homepath // empty' "$PLATFORM_FILE")
+  [ -z "$HOMEPATH" ] && HOMEPATH=$(jq -r '.homepath // empty' "$FLAVOR_FILE")
+
+  PLATFORM_MODE=true
+
+else
+  # --- modo clásico: ./sigic_install.sh <flavor> <https_mode> ---
+  FLAVOR=$ARG1
+  HTTPS_MODE=$ARG2
+
+  if [ -z "$HTTPS_MODE" ]; then
+    echo "Uso: ./sigic_install.sh <sabor> [http|https|externalhttps]"
+    echo "El valor de <sabor> debe corresponder a un archivo JSON en sigic-mixins/ (ej: default.json)"
+    exit 1
+  fi
+
+  FLAVOR_FILE="sigic-mixins/$FLAVOR.json"
+
+  if [ ! -f "$FLAVOR_FILE" ]; then
+    echo "No existe flavor: $FLAVOR_FILE"
+    exit 1
+  fi
+
+  echo "Flavor: $FLAVOR"
+
+  ENV_TYPE=$(jq -r '.env_type' "$FLAVOR_FILE")
+  HOSTNAME=$(jq -r '.hostname' "$FLAVOR_FILE")
+  EMAIL=$(jq -r '.email' "$FLAVOR_FILE")
+  OIDC_URL=$(jq -r '.oidc_provider_url' "$FLAVOR_FILE")
+  HOMEPATH=$(jq -r '.homepath' "$FLAVOR_FILE")
+
+  PLATFORM_MODE=false
+fi
+
+# =========================
+# 🔹 HTTPS runtime
 # =========================
 
 HTTPS_FLAG=""
@@ -42,11 +118,7 @@ case "$HTTPS_MODE" in
     ;;
 esac
 
-echo "🌐 Modo: ${HTTPS_MODE:-http}"
-
-# =========================
-# 🔹 generar .env + jsons
-# =========================
+echo "Modo HTTPS: ${HTTPS_MODE:-http}"
 
 # =========================
 # 🔹 convertir JSON a flags
@@ -54,20 +126,18 @@ echo "🌐 Modo: ${HTTPS_MODE:-http}"
 
 FLAGS=""
 
-# boolean flags
+# boolean flags: platform overrides > base flavor
 for key in useoidc usefrontendadmin usefrontendapp enableiaproxy enableiadb enablelevantamientoproxy enablelevantamientodb; do
-  val=$(jq -r ".$key" "$FLAVOR_FILE")
+  if [ "$PLATFORM_MODE" = true ]; then
+    val=$(jq -r ".overrides.$key // empty" "$PLATFORM_FILE")
+    [ -z "$val" ] && val=$(jq -r ".$key // empty" "$FLAVOR_FILE")
+  else
+    val=$(jq -r ".$key" "$FLAVOR_FILE")
+  fi
   if [ "$val" = "true" ]; then
     FLAGS="$FLAGS --$key"
   fi
 done
-
-# string flags
-ENV_TYPE=$(jq -r '.env_type' "$FLAVOR_FILE")
-HOSTNAME=$(jq -r '.hostname' "$FLAVOR_FILE")
-EMAIL=$(jq -r '.email' "$FLAVOR_FILE")
-OIDC_URL=$(jq -r '.oidc_provider_url' "$FLAVOR_FILE")
-HOMEPATH=$(jq -r '.homepath' "$FLAVOR_FILE")
 
 # =========================
 # 🔹 ejecutar script real
