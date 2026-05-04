@@ -1,0 +1,15 @@
+{
+  "platform": "idegeo",
+  "description": "IDEGEO - Infraestructura de Datos Espaciales de México",
+  "extends": "geonode-frontend-keycloak",
+  "overrides": {
+    "homepath": "app",
+    "useoidc": true,
+    "usefrontendadmin": true,
+    "usefrontendapp": true,
+    "enableiaproxy": false,
+    "enableiadb": false,
+    "enablelevantamientoproxy": false,
+    "enablelevantamientodb": false
+  }
+}
