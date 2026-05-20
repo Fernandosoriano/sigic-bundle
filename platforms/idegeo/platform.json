@@ -2,6 +2,11 @@
   "platform": "idegeo",
   "description": "IDEGEO - Infraestructura de Datos Espaciales de México",
   "extends": "geonode-frontend-keycloak",
+  "ports": {
+    "nginx": 8001,
+    "frontend_admin": 3001,
+    "frontend_app": 3002
+  },
   "overrides": {
     "homepath": "app",
     "useoidc": true,

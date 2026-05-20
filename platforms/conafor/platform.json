@@ -2,6 +2,11 @@
   "platform": "conafor",
   "description": "CONAFOR - Comisión Nacional Forestal",
   "extends": "geonode-frontend-keycloak",
+  "ports": {
+    "nginx": 8002,
+    "frontend_admin": 3011,
+    "frontend_app": 3012
+  },
   "overrides": {
     "homepath": "app",
     "useoidc": true,

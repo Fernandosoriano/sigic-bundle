@@ -33,7 +33,7 @@ if [ -d "platforms/$ARG1" ]; then
     echo "Environments disponibles: $(ls platforms/$PLATFORM/env/ 2>/dev/null | sed 's/\.env//' | tr '\n' ' ')"
     exit 1
   fi
-
+  # HERENCIA
   BASE_FLAVOR=$(jq -r '.extends' "$PLATFORM_FILE")
   FLAVOR_FILE="sigic-mixins/$BASE_FLAVOR.json"
 
@@ -63,6 +63,16 @@ if [ -d "platforms/$ARG1" ]; then
 
   HOMEPATH=$(jq -r '.overrides.homepath // empty' "$PLATFORM_FILE")
   [ -z "$HOMEPATH" ] && HOMEPATH=$(jq -r '.homepath // empty' "$FLAVOR_FILE")
+
+  # puertos por plataforma
+  NGINX_PORT=$(jq -r '.ports.nginx' "$PLATFORM_FILE")
+  ADMIN_PORT=$(jq -r '.ports.frontend_admin' "$PLATFORM_FILE")
+  APP_PORT=$(jq -r '.ports.frontend_app' "$PLATFORM_FILE")
+
+  export COMPOSE_PROJECT_NAME=$PLATFORM
+  export HTTP_PORT=$NGINX_PORT
+  export FRONTEND_ADMIN_PORT=$ADMIN_PORT
+  export FRONTEND_APP_PORT=$APP_PORT
 
   PLATFORM_MODE=true
 
