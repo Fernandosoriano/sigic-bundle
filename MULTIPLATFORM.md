@@ -10,6 +10,21 @@ El `sigic-bundle` original permite desplegar una única instancia de la platafor
 
 ---
 
+## Alcance por fase
+
+| Capacidad | Mecanismo | Estado |
+|-----------|-----------|--------|
+| Un solo bundle para todas las plataformas (sin forks del bundle) | `platforms/` + `sigic_install.sh` | ✅ Fase 1 |
+| Despliegue con un solo comando por plataforma+ambiente | `./sigic_install.sh <plataforma> <ambiente>` | ✅ Fase 1 |
+| Aislamiento de contenedores y puertos por plataforma | `COMPOSE_PROJECT_NAME` + puertos en `platform.json` | ✅ Fase 1 |
+| Configuración distinta por plataforma (hostname, OIDC, flags) | `platform.json` + `env/*.env` | ✅ Fase 1 |
+| Archivos específicos por plataforma sin forks (landing pages, templates, assets, vistas) | `platforms/<nombre>/overrides/<submodulo>/` + Docker BuildKit | ⏳ Fase 2 |
+| Lógica de negocio fundamentalmente distinta entre plataformas | Overlays cubre la mayoría; branches por submodulo solo si hay divergencia extrema | Por definir |
+
+El mecanismo de overlays (Fase 2) permite que archivos específicos de cada plataforma — páginas Nuxt, templates Django, configuraciones de IA, assets — vivan en `platforms/<nombre>/overrides/` dentro del bundle. Docker BuildKit los inyecta sobre el código del submodulo al momento del build. **El submodulo no se toca y no hay forks.**
+
+---
+
 ## Arquitectura general
 
 ```
@@ -217,6 +232,8 @@ overrides/keycloak/keycloak-client-*.json
 
 ## Estado actual
 
+### Fase 1 — Orquestación y configuración
+
 | Tarea | Estado |
 |-------|--------|
 | Estructura `platforms/` | Completado |
@@ -225,10 +242,22 @@ overrides/keycloak/keycloak-client-*.json
 | Puertos por plataforma en `platform.json` | Completado |
 | Puertos configurables en `docker-compose.yml` | Completado |
 | Prueba end-to-end idegeo dev en servidor | Completado |
-| Traefik como reverse proxy interno | Pendiente |
-| Configuración Apache/DNS por infra CentroGeo | Pendiente |
-| Prueba multi-plataforma simultánea | Pendiente |
-| volver submodulo la carpeta platforms | Pendiente |
-| verificar el correcto funcionamiento de external https en nuestra nueva firma del uso de sigic_install.sh (por plataforma) | Pendiente |
+| Nginx de sistema como reverse proxy en 10.2.102.228 | Pendiente |
+| Redeployar idegeo en modo plataforma (puerto 8001) | Pendiente |
+| Configuración Apache/DNS por infra CentroGeo (subdominos adicionales) | Pendiente |
+| Prueba multi-plataforma simultánea (idegeo + conafor en mismo servidor) | Pendiente |
+| Verificar el correcto funcionamiento de externalhttps en modo plataforma | Pendiente |
+| Convertir `platforms/` en submodulo git | Pendiente |
+
+### Fase 2 — Overlays de código por plataforma (sin forks de submodulos)
+
+| Tarea | Estado |
+|-------|--------|
+| Crear estructura `platforms/<nombre>/overrides/<submodulo>/` | Pendiente |
+| Agregar soporte de overlays vía Docker BuildKit al `Dockerfile` del frontend | Pendiente |
+| Migrar archivos personalizados del frontend de repos forkeados a `overrides/frontend/` | Pendiente |
+| Verificar que la landing page personalizada aparece correctamente | Pendiente |
+| Extender el mecanismo de overlays a geonode e ia-engine si se necesita | Pendiente |
+| Archivar repos forkeados de submódulos | Pendiente |
 
 
