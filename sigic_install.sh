@@ -183,6 +183,7 @@ if [ "$PLATFORM_MODE" = true ]; then
   mkdir -p proxy/conf.d
   PROXY_CONF="proxy/conf.d/${PLATFORM}-${ENVIRONMENT}.conf"
 
+  # bloque puerto 80 — siempre presente
   cat > "$PROXY_CONF" << NGINXEOF
 server {
     listen 80;
@@ -202,7 +203,23 @@ server {
 }
 NGINXEOF
 
+  echo "📄 Proxy config generado: $PROXY_CONF"
+
   if [ "$HTTPS_MODE" = "externalhttps" ]; then
+    # fase 1: recargar proxy con solo puerto 80 para que certbot pueda validar
+    docker exec nginx-proxy nginx -s reload 2>/dev/null || true
+
+    # obtener/renovar certificado
+    echo "🔒 Obteniendo certificado SSL para ${HOSTNAME}..."
+    docker compose -f proxy/docker-compose.yml --profile certbot run --rm \
+      certbot certonly \
+      --webroot -w /var/www/acme-challenge \
+      --non-interactive --agree-tos \
+      -m "${EMAIL}" \
+      -d "${HOSTNAME}" \
+      --keep-until-expiring
+
+    # fase 2: agregar bloque puerto 443 ahora que el cert existe
     cat >> "$PROXY_CONF" << NGINXEOF
 
 server {
@@ -225,9 +242,8 @@ server {
     }
 }
 NGINXEOF
+    echo "🔒 Bloque SSL agregado al proxy config"
   fi
-
-  echo "📄 Proxy config generado: $PROXY_CONF"
 
   # escribir PLATFORM_HOST en .env para docker-compose.platform.yml
   echo "PLATFORM_HOST=${HOSTNAME}" >> .env
@@ -254,7 +270,7 @@ if echo "$PROFILES" | grep -q "oidc"; then
 
   echo "🚀 Ejecutando import de clientes..."
 
-  docker exec keycloak4sigic bash -c "/scripts/import-keycloak-clients.sh"
+  docker exec keycloak4${COMPOSE_PROJECT_NAME} bash -c "/scripts/import-keycloak-clients.sh"
 
   echo "✅ Keycloak configurado"
 
@@ -276,7 +292,7 @@ if echo "$PROFILES" | grep -q "geonode"; then
 
   echo "🚀 Cargando fixture socialaccount..."
 
-  docker exec django4sigic bash -c "python manage.py loaddata /usr/src/sigic_geonode/fixtures/socialaccount.json" || true
+  docker exec django4${COMPOSE_PROJECT_NAME} bash -c "python manage.py loaddata /usr/src/sigic_geonode/fixtures/socialaccount.json" || true
 
   echo "✅ Fixture cargado"
 fi

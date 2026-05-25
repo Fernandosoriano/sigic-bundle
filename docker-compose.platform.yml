@@ -1,17 +1,14 @@
 services:
   nginx:
-    ports: []
     networks:
-      default:
+      sigicnetwork:
       sigic-proxy:
 
   frontend-admin:
-    ports: []
     extra_hosts:
       - "${PLATFORM_HOST}:host-gateway"
 
   frontend-app:
-    ports: []
     extra_hosts:
       - "${PLATFORM_HOST}:host-gateway"
 
