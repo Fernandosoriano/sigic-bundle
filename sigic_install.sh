@@ -75,6 +75,7 @@ if [ -d "platforms/$ARG1" ]; then
   export FRONTEND_APP_PORT=$APP_PORT
 
   PLATFORM_MODE=true
+  export PLATFORM_HOST=$HOSTNAME
 
 else
   # --- modo clásico: ./sigic_install.sh <flavor> <https_mode> ---
@@ -170,7 +171,74 @@ PROFILES=$(jq -r '.profiles | join(",")' "$FLAVOR_FILE")
 
 echo "🚀 Profiles: $PROFILES"
 
-COMPOSE_PROFILES=$PROFILES docker compose up -d
+# =========================
+# 🔹 proxy (solo en modo plataforma)
+# =========================
+
+if [ "$PLATFORM_MODE" = true ]; then
+  # crear red compartida si no existe
+  docker network create sigic-proxy 2>/dev/null || true
+
+  # generar config nginx del proxy para esta plataforma+ambiente
+  mkdir -p proxy/conf.d
+  PROXY_CONF="proxy/conf.d/${PLATFORM}-${ENVIRONMENT}.conf"
+
+  cat > "$PROXY_CONF" << NGINXEOF
+server {
+    listen 80;
+    server_name ${HOSTNAME};
+
+    location / {
+        proxy_pass http://nginx4${PLATFORM};
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_buffer_size          128k;
+        proxy_buffers              4 256k;
+        proxy_busy_buffers_size    256k;
+        large_client_header_buffers 4 16k;
+    }
+}
+NGINXEOF
+
+  if [ "$HTTPS_MODE" = "externalhttps" ]; then
+    cat >> "$PROXY_CONF" << NGINXEOF
+
+server {
+    listen 443 ssl;
+    server_name ${HOSTNAME};
+
+    ssl_certificate     /etc/letsencrypt/live/${HOSTNAME}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${HOSTNAME}/privkey.pem;
+
+    location / {
+        proxy_pass http://nginx4${PLATFORM};
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_buffer_size          128k;
+        proxy_buffers              4 256k;
+        proxy_busy_buffers_size    256k;
+        large_client_header_buffers 4 16k;
+    }
+}
+NGINXEOF
+  fi
+
+  echo "📄 Proxy config generado: $PROXY_CONF"
+
+  # escribir PLATFORM_HOST en .env para docker-compose.platform.yml
+  echo "PLATFORM_HOST=${HOSTNAME}" >> .env
+
+  COMPOSE_PROFILES=$PROFILES docker compose -f docker-compose.yml -f docker-compose.platform.yml up -d
+
+  # recargar proxy si está corriendo
+  docker exec nginx-proxy nginx -s reload 2>/dev/null || true
+else
+  COMPOSE_PROFILES=$PROFILES docker compose up -d
+fi
 
 
 # =========================

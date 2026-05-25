@@ -1,0 +1,31 @@
+services:
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d:ro
+      - acme-challenge:/var/www/acme-challenge
+      - letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - sigic-proxy
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - acme-challenge:/var/www/acme-challenge
+      - letsencrypt:/etc/letsencrypt
+    profiles:
+      - certbot
+
+volumes:
+  acme-challenge:
+  letsencrypt:
+
+networks:
+  sigic-proxy:
+    external: true

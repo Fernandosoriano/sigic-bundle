@@ -138,6 +138,10 @@ celerybeat.pid
 # Generated Keycloak client JSONs (contain secrets, regenerated on each install)
 overrides/keycloak/keycloak-client-*.json
 
+# Generated nginx proxy configs (regenerated on each install by sigic_install.sh)
+proxy/conf.d/*.conf
+!proxy/conf.d/00-default.conf
+
 # Environments
 .env
 .envrc

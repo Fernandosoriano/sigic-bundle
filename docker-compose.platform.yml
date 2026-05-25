@@ -1,0 +1,52 @@
+services:
+  nginx:
+    ports: []
+    networks:
+      default:
+      sigic-proxy:
+
+  frontend-admin:
+    ports: []
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+  frontend-app:
+    ports: []
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+  django:
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+  celery:
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+  geoserver:
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+  keycloak:
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+  ia-engine:
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+  ia-queue:
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+  ia-lb:
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+  levantamiento:
+    extra_hosts:
+      - "${PLATFORM_HOST}:host-gateway"
+
+networks:
+  sigic-proxy:
+    external: true
