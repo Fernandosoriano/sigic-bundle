@@ -175,6 +175,14 @@ echo "🚀 Profiles: $PROFILES"
 # =========================
 
 if [ "$PLATFORM_MODE" = true ]; then
+  # En modo plataforma los contenedores no exponen puertos al host —
+  # nginx-proxy los alcanza por nombre en la red sigic-proxy.
+  # Vaciar las vars en .env evita conflictos si alguien corre compose directo.
+  sed -i 's/^HTTP_PORT=.*/HTTP_PORT=/' .env
+  sed -i 's/^HTTPS_PORT=.*/HTTPS_PORT=/' .env
+  sed -i 's/^FRONTEND_ADMIN_PORT=.*/FRONTEND_ADMIN_PORT=/' .env
+  sed -i 's/^FRONTEND_APP_PORT=.*/FRONTEND_APP_PORT=/' .env
+
   # crear red compartida si no existe
   docker network create sigic-proxy 2>/dev/null || true
 
