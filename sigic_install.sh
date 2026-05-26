@@ -196,6 +196,8 @@ server {
     listen 80;
     server_name ${HOSTNAME};
 
+    large_client_header_buffers 4 16k;
+
     location / {
         proxy_pass http://nginx4${PLATFORM};
         proxy_set_header Host \$host;
@@ -205,7 +207,6 @@ server {
         proxy_buffer_size          128k;
         proxy_buffers              4 256k;
         proxy_busy_buffers_size    256k;
-        large_client_header_buffers 4 16k;
     }
 }
 NGINXEOF
@@ -236,6 +237,8 @@ server {
     ssl_certificate     /etc/letsencrypt/live/${HOSTNAME}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${HOSTNAME}/privkey.pem;
 
+    large_client_header_buffers 4 16k;
+
     location / {
         proxy_pass http://nginx4${PLATFORM};
         proxy_set_header Host \$host;
@@ -245,7 +248,6 @@ server {
         proxy_buffer_size          128k;
         proxy_buffers              4 256k;
         proxy_busy_buffers_size    256k;
-        large_client_header_buffers 4 16k;
     }
 }
 NGINXEOF
