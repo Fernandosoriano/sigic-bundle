@@ -64,15 +64,14 @@ if [ -d "platforms/$ARG1" ]; then
   HOMEPATH=$(jq -r '.overrides.homepath // empty' "$PLATFORM_FILE")
   [ -z "$HOMEPATH" ] && HOMEPATH=$(jq -r '.homepath // empty' "$FLAVOR_FILE")
 
-  # puertos por plataforma
-  NGINX_PORT=$(jq -r '.ports.nginx' "$PLATFORM_FILE")
-  ADMIN_PORT=$(jq -r '.ports.frontend_admin' "$PLATFORM_FILE")
-  APP_PORT=$(jq -r '.ports.frontend_app' "$PLATFORM_FILE")
-
   export COMPOSE_PROJECT_NAME=$PLATFORM
-  export HTTP_PORT=$NGINX_PORT
-  export FRONTEND_ADMIN_PORT=$ADMIN_PORT
-  export FRONTEND_APP_PORT=$APP_PORT
+  # En modo plataforma, nginx4X no expone puertos al host — nginx-proxy llega
+  # por la red sigic-proxy usando el nombre de contenedor. Exportar vacío hace
+  # que Docker asigne puertos random (no conflictúan con nginx-proxy).
+  export HTTP_PORT=""
+  export HTTPS_PORT=""
+  export FRONTEND_ADMIN_PORT=""
+  export FRONTEND_APP_PORT=""
 
   PLATFORM_MODE=true
   export PLATFORM_HOST=$HOSTNAME
