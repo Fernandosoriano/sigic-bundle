@@ -1,31 +1,72 @@
+# =============================================================================
+#  PROXY MULTIPLATFORMA - SIGIC
+#  Este docker-compose levanta el proxy central que recibe todo el tráfico
+#  de internet y lo distribuye a cada plataforma (idegeo, conafor, sedema)
+# =============================================================================
+
 services:
+
+  # ---------------------------------------------------------------------------
+  #  NGINX-PROXY
+  #  Punto de entrada único para todas las plataformas.
+  #  Recibe tráfico HTTP (80) y HTTPS (443) y lo enruta al contenedor
+  #  correcto según el dominio (nginx4idegeo, nginx4sedema, etc.)
+  # ---------------------------------------------------------------------------
   nginx-proxy:
     image: nginx:alpine
-    container_name: nginx-proxy
+    container_name: nginx-proxy  # nombre fijo — sigic_install.sh lo referencia directamente
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:80"    # HTTP  — necesario para el ACME challenge de Let's Encrypt
+      - "443:443"  # HTTPS — tráfico cifrado de usuarios
     volumes:
+      # archivos de config generados automáticamente por sigic_install.sh
+      # uno por plataforma+ambiente: idegeo-dev.conf, sedema-prd.conf, etc.
       - ./conf.d:/etc/nginx/conf.d:ro
+
+      # volumen compartido con certbot para el ACME challenge
+      # certbot escribe el token aquí, nginx-proxy lo sirve a Let's Encrypt
       - acme-challenge:/var/www/acme-challenge
+
+      # volumen compartido con certbot para los certificados SSL
+      # certbot guarda los certs aquí, nginx-proxy los lee (solo lectura)
       - letsencrypt:/etc/letsencrypt:ro
     networks:
-      - sigic-proxy
-    restart: unless-stopped
+      - sigic-proxy  # red compartida con todos los bundles de plataformas
+    restart: unless-stopped  # se reinicia automáticamente si el servidor se apaga
 
+  # ---------------------------------------------------------------------------
+  #  CERTBOT
+  #  Obtiene y renueva certificados SSL de Let's Encrypt.
+  #  NO corre constantemente — solo se activa cuando sigic_install.sh
+  #  necesita obtener o renovar un certificado:
+  #    docker compose --profile certbot run --rm certbot certonly ...
+  # ---------------------------------------------------------------------------
   certbot:
     image: certbot/certbot
     container_name: certbot
     volumes:
+      # escribe el token del ACME challenge aquí para que nginx-proxy lo sirva
       - acme-challenge:/var/www/acme-challenge
+
+      # guarda los certificados aquí para que nginx-proxy los use
       - letsencrypt:/etc/letsencrypt
     profiles:
-      - certbot
+      - certbot  # solo corre cuando se llama explícitamente con --profile certbot docker compose --profile certbot run --rm certbot certonly ...
 
+# =============================================================================
+#  VOLÚMENES COMPARTIDOS
+#  Estos volúmenes son el puente entre certbot y nginx-proxy
+# =============================================================================
 volumes:
-  acme-challenge:
-  letsencrypt:
+  acme-challenge:  # temporal — tokens del ACME challenge
+  letsencrypt:     # permanente — certificados SSL de todas las plataformas
 
+# =============================================================================
+#  REDES
+#  sigic-proxy es externa — la crea sigic_install.sh antes de levantar
+#  cualquier plataforma con: docker network create sigic-proxy
+#  Conecta nginx-proxy con nginx4idegeo, nginx4sedema, nginx4conafor, etc.
+# =============================================================================
 networks:
   sigic-proxy:
     external: true
