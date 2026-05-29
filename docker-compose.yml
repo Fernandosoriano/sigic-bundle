@@ -142,7 +142,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8080:8080"
+      - "${GEOSERVER_PORT:-8080}:8080"
     volumes:
       - statics:/mnt/volumes/statics
       - geoserver-data-dir:/geoserver_data/data
@@ -198,7 +198,7 @@ services:
     healthcheck:
       test: "pg_isready -d postgres -U postgres"
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     expose:
       - "5432"
     networks: [sigicnetwork]

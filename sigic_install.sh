@@ -182,6 +182,8 @@ if [ "$PLATFORM_MODE" = true ]; then
   sed -i 's/^HTTPS_PORT=.*/HTTPS_PORT=/' .env
   sed -i 's/^FRONTEND_ADMIN_PORT=.*/FRONTEND_ADMIN_PORT=/' .env
   sed -i 's/^FRONTEND_APP_PORT=.*/FRONTEND_APP_PORT=/' .env
+  sed -i 's/^DB_PORT=.*/DB_PORT=/' .env
+  sed -i 's/^GEOSERVER_PORT=.*/GEOSERVER_PORT=/' .env
 
   # crear red compartida si no existe
   docker network create sigic-proxy 2>/dev/null || true
