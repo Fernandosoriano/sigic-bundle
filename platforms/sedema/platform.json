@@ -2,11 +2,6 @@
   "platform": "sedema",
   "description": "SEDEMA - Secretaría del Medio Ambiente",
   "extends": "geonode-frontend-keycloak",
-  "ports": {
-    "nginx": 8003,
-    "frontend_admin": 3021,
-    "frontend_app": 3022
-  },
   "overrides": {
     "homepath": "app",
     "useoidc": true,
