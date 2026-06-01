@@ -188,6 +188,9 @@ if [ "$PLATFORM_MODE" = true ]; then
   # crear red compartida si no existe
   docker network create sigic-proxy 2>/dev/null || true
 
+  # arrancar nginx-proxy si no está corriendo
+  docker compose -f proxy/docker-compose.yml up -d nginx-proxy
+
   # generar config nginx del proxy para esta plataforma+ambiente
   mkdir -p proxy/conf.d
   PROXY_CONF="proxy/conf.d/${PLATFORM}-${ENVIRONMENT}.conf"
