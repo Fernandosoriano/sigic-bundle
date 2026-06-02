@@ -16,50 +16,42 @@ services:
     image: nginx:alpine
     container_name: nginx-proxy  # nombre fijo — sigic_install.sh lo referencia directamente
     ports:
-      - "80:80"    # HTTP  — necesario para el ACME challenge de Let's Encrypt
-      - "443:443"  # HTTPS — tráfico cifrado de usuarios
+      - "80:80"    # HTTP — Mario (Apache en 10.2.7.26) termina SSL y reenvía HTTP plano aquí
+      # - "443:443"  # HTTPS — desactivado: Mario gestiona SSL externamente
     volumes:
       # archivos de config generados automáticamente por sigic_install.sh
       # uno por plataforma+ambiente: idegeo-dev.conf, sedema-prd.conf, etc.
       - ./conf.d:/etc/nginx/conf.d:ro
 
-      # volumen compartido con certbot para el ACME challenge
-      # certbot escribe el token aquí, nginx-proxy lo sirve a Let's Encrypt
+      # volumen para servir el token ACME que Mario nos mande (HTTP-01 challenge)
+      # Mario corre certbot en su Apache → nos manda el token → lo colocamos aquí
       - acme-challenge:/var/www/acme-challenge
 
-      # volumen compartido con certbot para los certificados SSL
-      # certbot guarda los certs aquí, nginx-proxy los lee (solo lectura)
-      - letsencrypt:/etc/letsencrypt:ro
+      # - letsencrypt:/etc/letsencrypt:ro  # desactivado: los certs los gestiona Mario
     networks:
       - sigic-proxy  # red compartida con todos los bundles de plataformas
     restart: unless-stopped  # se reinicia automáticamente si el servidor se apaga
 
   # ---------------------------------------------------------------------------
-  #  CERTBOT
-  #  Obtiene y renueva certificados SSL de Let's Encrypt.
-  #  NO corre constantemente — solo se activa cuando sigic_install.sh
-  #  necesita obtener o renovar un certificado:
-  #    docker compose --profile certbot run --rm certbot certonly ...
+  #  CERTBOT — desactivado: Mario gestiona SSL externamente
+  #  Descomentar si en algún momento gestionamos nuestros propios certificados.
   # ---------------------------------------------------------------------------
-  certbot:
-    image: certbot/certbot
-    container_name: certbot
-    volumes:
-      # escribe el token del ACME challenge aquí para que nginx-proxy lo sirva
-      - acme-challenge:/var/www/acme-challenge
-
-      # guarda los certificados aquí para que nginx-proxy los use
-      - letsencrypt:/etc/letsencrypt
-    profiles:
-      - certbot  # solo corre cuando se llama explícitamente con --profile certbot docker compose --profile certbot run --rm certbot certonly ...
+  # certbot:
+  #   image: certbot/certbot
+  #   container_name: certbot
+  #   volumes:
+  #     - acme-challenge:/var/www/acme-challenge
+  #     - letsencrypt:/etc/letsencrypt
+  #   profiles:
+  #     - certbot
 
 # =============================================================================
 #  VOLÚMENES COMPARTIDOS
 #  Estos volúmenes son el puente entre certbot y nginx-proxy
 # =============================================================================
 volumes:
-  acme-challenge:  # temporal — tokens del ACME challenge
-  letsencrypt:     # permanente — certificados SSL de todas las plataformas
+  acme-challenge:  # tokens ACME que Mario nos mande para HTTP-01 challenge
+  # letsencrypt:   # desactivado: Mario gestiona los certificados SSL
 
 # =============================================================================
 #  REDES

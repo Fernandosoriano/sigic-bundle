@@ -226,46 +226,17 @@ NGINXEOF
 
   echo "📄 Proxy config generado: $PROXY_CONF"
 
-  if [ "$HTTPS_MODE" = "externalhttps" ]; then
-    # fase 1: recargar proxy con solo puerto 80 para que certbot pueda validar
-    docker exec nginx-proxy nginx -s reload 2>/dev/null || true
-
-    # obtener/renovar certificado
-    echo "🔒 Obteniendo certificado SSL para ${HOSTNAME}..."
-    docker compose -p proxy -f proxy/docker-compose.yml --profile certbot run --rm \
-      certbot certonly \
-      --webroot -w /var/www/acme-challenge \
-      --non-interactive --agree-tos \
-      -m "${EMAIL}" \
-      -d "${HOSTNAME}" \
-      --keep-until-expiring
-
-    # fase 2: agregar bloque puerto 443 ahora que el cert existe
-    cat >> "$PROXY_CONF" << NGINXEOF
-
-server {
-    listen 443 ssl;
-    server_name ${HOSTNAME};
-
-    ssl_certificate     /etc/letsencrypt/live/${HOSTNAME}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${HOSTNAME}/privkey.pem;
-
-    large_client_header_buffers 4 16k;
-
-    location / {
-        proxy_pass http://nginx4${PLATFORM};
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_buffer_size          128k;
-        proxy_buffers              4 256k;
-        proxy_busy_buffers_size    256k;
-    }
-}
-NGINXEOF
-    echo "🔒 Bloque SSL agregado al proxy config"
-  fi
+  # SSL en modo plataforma es gestionado por Mario (Apache en 10.2.7.26).
+  # Mario termina SSL externamente y reenvía HTTP plano a nuestro nginx-proxy.
+  # Descomentar este bloque si en algún momento gestionamos nuestros propios certs.
+  # if [ "$HTTPS_MODE" = "externalhttps" ]; then
+  #   docker exec nginx-proxy nginx -s reload 2>/dev/null || true
+  #   docker compose -p proxy -f proxy/docker-compose.yml --profile certbot run --rm \
+  #     certbot certonly --webroot -w /var/www/acme-challenge \
+  #     --non-interactive --agree-tos -m "${EMAIL}" -d "${HOSTNAME}" --keep-until-expiring
+  #   # agregar bloque 443 ssl al proxy config...
+  #   echo "🔒 Bloque SSL agregado al proxy config"
+  # fi
 
   COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d
 
