@@ -238,7 +238,7 @@ NGINXEOF
   #   echo "🔒 Bloque SSL agregado al proxy config"
   # fi
 
-  COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d
+  COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d || true
 
   # reintentar si init-keycloak-db falla por race condition con PostgreSQL
   # (pg_isready pasa antes de que el init script haya creado los usuarios)
@@ -255,7 +255,7 @@ NGINXEOF
     echo "⚠️  init-keycloak-db falló (intento $attempt/3) — reintentando en 20s..."
     docker rm "$INIT_CONTAINER" 2>/dev/null || true
     sleep 20
-    COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d
+    COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d || true
   done
 
   # recargar proxy si está corriendo
