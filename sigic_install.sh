@@ -240,6 +240,24 @@ NGINXEOF
 
   COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d
 
+  # reintentar si init-keycloak-db falla por race condition con PostgreSQL
+  # (pg_isready pasa antes de que el init script haya creado los usuarios)
+  INIT_CONTAINER="${PLATFORM}-init-keycloak-db-1"
+  for attempt in 1 2 3; do
+    # esperar a que el contenedor termine (poll cada 10s, max 3 min)
+    for i in $(seq 1 18); do
+      STATUS=$(docker inspect --format='{{.State.Status}}' "$INIT_CONTAINER" 2>/dev/null || echo "missing")
+      [ "$STATUS" = "exited" ] || [ "$STATUS" = "missing" ] && break
+      sleep 10
+    done
+    EXIT_CODE=$(docker inspect --format='{{.State.ExitCode}}' "$INIT_CONTAINER" 2>/dev/null || echo "0")
+    [ "$EXIT_CODE" = "0" ] && break
+    echo "⚠️  init-keycloak-db falló (intento $attempt/3) — reintentando en 20s..."
+    docker rm "$INIT_CONTAINER" 2>/dev/null || true
+    sleep 20
+    COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d
+  done
+
   # recargar proxy si está corriendo
   docker exec nginx-proxy nginx -s reload 2>/dev/null || true
 else
