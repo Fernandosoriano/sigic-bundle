@@ -12,6 +12,7 @@ if [ -d "platforms/$ARG1" ]; then
   # --- modo platform: ./sigic_install.sh <platform> <environment> ---
   PLATFORM=$ARG1
   ENVIRONMENT=$ARG2
+  ENV_ACTIVE=".env.${PLATFORM}"
 
   if [ -z "$ENVIRONMENT" ]; then
     echo "Uso: ./sigic_install.sh <platform> <environment>"
@@ -103,6 +104,7 @@ else
   HOMEPATH=$(jq -r '.homepath' "$FLAVOR_FILE")
 
   PLATFORM_MODE=false
+  ENV_ACTIVE=".env"
 fi
 
 # =========================
@@ -185,6 +187,12 @@ if [ "$PLATFORM_MODE" = true ]; then
   sed -i 's/^DB_PORT=.*/DB_PORT=/' .env
   sed -i 's/^GEOSERVER_PORT=.*/GEOSERVER_PORT=/' .env
 
+  # escribir PLATFORM_HOST en .env para docker-compose.platform.yml
+  echo "PLATFORM_HOST=${HOSTNAME}" >> .env
+
+  # guardar env de esta plataforma en su propio archivo
+  cp .env "$ENV_ACTIVE"
+
   # crear red compartida si no existe
   docker network create sigic-proxy 2>/dev/null || true
 
@@ -224,7 +232,7 @@ NGINXEOF
 
     # obtener/renovar certificado
     echo "🔒 Obteniendo certificado SSL para ${HOSTNAME}..."
-    docker compose -f proxy/docker-compose.yml --profile certbot run --rm \
+    docker compose -p proxy -f proxy/docker-compose.yml --profile certbot run --rm \
       certbot certonly \
       --webroot -w /var/www/acme-challenge \
       --non-interactive --agree-tos \
@@ -259,10 +267,7 @@ NGINXEOF
     echo "🔒 Bloque SSL agregado al proxy config"
   fi
 
-  # escribir PLATFORM_HOST en .env para docker-compose.platform.yml
-  echo "PLATFORM_HOST=${HOSTNAME}" >> .env
-
-  COMPOSE_PROFILES=$PROFILES docker compose -f docker-compose.yml -f docker-compose.platform.yml up -d
+  COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d
 
   # recargar proxy si está corriendo
   docker exec nginx-proxy nginx -s reload 2>/dev/null || true
@@ -288,7 +293,7 @@ if echo "$PROFILES" | grep -q "oidc"; then
 
   echo "✅ Keycloak configurado"
 
-  cat .env | grep -E '^(GEOSERVER_ADMIN_PASSWORD|ADMIN_PASSWORD)='
+  cat "$ENV_ACTIVE" | grep -E '^(GEOSERVER_ADMIN_PASSWORD|ADMIN_PASSWORD)='
 fi
 
 
