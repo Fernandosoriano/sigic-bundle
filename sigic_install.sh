@@ -12,7 +12,7 @@ if [ -d "platforms/$ARG1" ]; then
   # --- modo platform: ./sigic_install.sh <platform> <environment> ---
   PLATFORM=$ARG1
   ENVIRONMENT=$ARG2
-  ENV_ACTIVE=".env.${PLATFORM}"
+  ENV_ACTIVE=".env.${PLATFORM}-${ENVIRONMENT}"
 
   if [ -z "$ENVIRONMENT" ]; then
     echo "Uso: ./sigic_install.sh <platform> <environment>"
@@ -65,7 +65,7 @@ if [ -d "platforms/$ARG1" ]; then
   HOMEPATH=$(jq -r '.overrides.homepath // empty' "$PLATFORM_FILE")
   [ -z "$HOMEPATH" ] && HOMEPATH=$(jq -r '.homepath // empty' "$FLAVOR_FILE")
 
-  export COMPOSE_PROJECT_NAME=$PLATFORM
+  export COMPOSE_PROJECT_NAME="${PLATFORM}-${ENVIRONMENT}"
   # En modo plataforma, nginx4X no expone puertos al host — nginx-proxy llega
   # por la red sigic-proxy usando el nombre de contenedor. Exportar vacío hace
   # que Docker asigne puertos random (no conflictúan con nginx-proxy).
@@ -212,7 +212,7 @@ server {
     large_client_header_buffers 4 16k;
 
     location / {
-        proxy_pass http://nginx4${PLATFORM};
+        proxy_pass http://nginx4${COMPOSE_PROJECT_NAME};
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -242,7 +242,7 @@ NGINXEOF
 
   # reintentar si init-keycloak-db falla por race condition con PostgreSQL
   # (pg_isready pasa antes de que el init script haya creado los usuarios)
-  INIT_CONTAINER="${PLATFORM}-init-keycloak-db-1"
+  INIT_CONTAINER="${COMPOSE_PROJECT_NAME}-init-keycloak-db-1"
   for attempt in 1 2 3; do
     # esperar a que el contenedor termine (poll cada 10s, max 3 min)
     for i in $(seq 1 18); do
