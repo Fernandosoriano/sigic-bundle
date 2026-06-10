@@ -5,10 +5,16 @@ services:
       sigic-proxy:
 
   frontend-admin:
+    build:
+      context: ./frontend
+      dockerfile: ../overrides/frontend/Dockerfile
     extra_hosts:
       - "${PLATFORM_HOST}:host-gateway"
 
   frontend-app:
+    build:
+      context: ./frontend
+      dockerfile: ../overrides/frontend/Dockerfile
     extra_hosts:
       - "${PLATFORM_HOST}:host-gateway"
 
