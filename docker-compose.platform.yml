@@ -5,16 +5,22 @@ services:
       sigic-proxy:
 
   frontend-admin:
+    image: sigic-frontend-admin:${COMPOSE_PROJECT_NAME}
     build:
       context: ./frontend
       dockerfile: ../overrides/frontend/Dockerfile
+      args:
+        NUXT_PUBLIC_APP_BASE_PATH: /admin/
     extra_hosts:
       - "${PLATFORM_HOST}:host-gateway"
 
   frontend-app:
+    image: sigic-frontend-app:${COMPOSE_PROJECT_NAME}
     build:
       context: ./frontend
       dockerfile: ../overrides/frontend/Dockerfile
+      args:
+        NUXT_PUBLIC_APP_BASE_PATH: /app/
     extra_hosts:
       - "${PLATFORM_HOST}:host-gateway"
 
