@@ -11,8 +11,6 @@ services:
       dockerfile: ../overrides/frontend/Dockerfile
       args:
         NUXT_PUBLIC_APP_BASE_PATH: /admin/
-    extra_hosts:
-      - "${PLATFORM_HOST}:host-gateway"
 
   frontend-app:
     image: sigic-frontend-app:${COMPOSE_PROJECT_NAME}
@@ -21,8 +19,6 @@ services:
       dockerfile: ../overrides/frontend/Dockerfile
       args:
         NUXT_PUBLIC_APP_BASE_PATH: /app/
-    extra_hosts:
-      - "${PLATFORM_HOST}:host-gateway"
 
   django:
     extra_hosts:
