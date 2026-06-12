@@ -13,7 +13,7 @@ services:
         NUXT_PUBLIC_APP_BASE_PATH: /admin/
     environment:
       NUXT_PUBLIC_AUTH_BASE_URL: "${SITEURL}admin/api/auth"
-      NUXT_AUTH_ORIGIN: ""
+      NUXT_AUTH_ORIGIN: "http://localhost:3000"
       NUXT_PUBLIC_AUTH_DISABLE_INTERNAL_ROUTING: "true"
 
   frontend-app:
@@ -25,7 +25,7 @@ services:
         NUXT_PUBLIC_APP_BASE_PATH: /app/
     environment:
       NUXT_PUBLIC_AUTH_BASE_URL: "${SITEURL}app/api/auth"
-      NUXT_AUTH_ORIGIN: ""
+      NUXT_AUTH_ORIGIN: "http://localhost:3000"
       NUXT_PUBLIC_AUTH_DISABLE_INTERNAL_ROUTING: "true"
 
   django:
