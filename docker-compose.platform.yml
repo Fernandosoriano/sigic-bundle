@@ -12,7 +12,7 @@ services:
       args:
         NUXT_PUBLIC_APP_BASE_PATH: /admin/
     environment:
-      NUXT_PUBLIC_AUTH_BASE_URL: "http://frontend-admin:3000/admin/api/auth"
+      NUXT_PUBLIC_AUTH_BASE_URL: "http://nginx/admin/api/auth"
 
   frontend-app:
     image: sigic-frontend-app:${COMPOSE_PROJECT_NAME}
@@ -22,7 +22,7 @@ services:
       args:
         NUXT_PUBLIC_APP_BASE_PATH: /app/
     environment:
-      NUXT_PUBLIC_AUTH_BASE_URL: "http://frontend-app:3000/app/api/auth"
+      NUXT_PUBLIC_AUTH_BASE_URL: "http://nginx/app/api/auth"
 
   django:
     extra_hosts:
