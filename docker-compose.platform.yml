@@ -12,7 +12,7 @@ services:
       args:
         NUXT_PUBLIC_APP_BASE_PATH: /admin/
     environment:
-      NUXT_PUBLIC_AUTH_BASE_URL: "http://localhost:3000/admin/api/auth"
+      NUXT_PUBLIC_AUTH_BASE_URL: "${SITEURL}admin/api/auth"
       NUXT_AUTH_ORIGIN: ""
       NUXT_PUBLIC_AUTH_DISABLE_INTERNAL_ROUTING: "true"
 
@@ -24,7 +24,7 @@ services:
       args:
         NUXT_PUBLIC_APP_BASE_PATH: /app/
     environment:
-      NUXT_PUBLIC_AUTH_BASE_URL: "http://localhost:3000/app/api/auth"
+      NUXT_PUBLIC_AUTH_BASE_URL: "${SITEURL}app/api/auth"
       NUXT_AUTH_ORIGIN: ""
       NUXT_PUBLIC_AUTH_DISABLE_INTERNAL_ROUTING: "true"
 
