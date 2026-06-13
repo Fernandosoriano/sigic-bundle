@@ -11,9 +11,6 @@ services:
       dockerfile: ../overrides/frontend/Dockerfile
       args:
         NUXT_PUBLIC_APP_BASE_PATH: /admin/
-    environment:
-      NUXT_PUBLIC_AUTH_BASE_URL: "${SITEURL}admin/api/auth"
-      NUXT_AUTH_ORIGIN: ""
 
   frontend-app:
     image: sigic-frontend-app:${COMPOSE_PROJECT_NAME}
@@ -22,9 +19,6 @@ services:
       dockerfile: ../overrides/frontend/Dockerfile
       args:
         NUXT_PUBLIC_APP_BASE_PATH: /app/
-    environment:
-      NUXT_PUBLIC_AUTH_BASE_URL: "${SITEURL}app/api/auth"
-      NUXT_AUTH_ORIGIN: ""
 
   django:
     extra_hosts:
