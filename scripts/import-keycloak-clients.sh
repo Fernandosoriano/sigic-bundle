@@ -24,15 +24,14 @@ IMPORT_DIR="/opt/keycloak/data/import"
 
 echo "Checking realm $REALM..."
 
-REALM_EXISTS=$(/opt/keycloak/bin/kcadm.sh get realms/$REALM 2>/dev/null || true)
-
-if [ -z "$REALM_EXISTS" ]; then
-  echo "Creating realm $REALM"
-  /opt/keycloak/bin/kcadm.sh create realms \
+if /opt/keycloak/bin/kcadm.sh get realms/$REALM > /dev/null 2>&1; then
+  echo "Updating realm $REALM"
+  /opt/keycloak/bin/kcadm.sh update realms/$REALM \
     -f $IMPORT_DIR/keycloak-realm-sigic.json \
     -s realm=$REALM -s displayName=$REALM
 else
-  echo "Updating realm $REALM"
+  echo "Creating realm $REALM"
+  /opt/keycloak/bin/kcadm.sh create realms -s realm=$REALM -s enabled=true
   /opt/keycloak/bin/kcadm.sh update realms/$REALM \
     -f $IMPORT_DIR/keycloak-realm-sigic.json \
     -s realm=$REALM -s displayName=$REALM
