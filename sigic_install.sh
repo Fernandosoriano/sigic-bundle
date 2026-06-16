@@ -272,13 +272,21 @@ fi
 if echo "$PROFILES" | grep -q "oidc"; then
   echo "🔐 Detectado profile oidc → importando configuración de Keycloak..."
 
-  # esperar a que keycloak esté listo
+  # esperar a que keycloak esté listo (cold start puede tardar varios minutos)
   echo "⏳ Esperando Keycloak..."
-  sleep 30
+  KEYCLOAK_CONTAINER="keycloak4${COMPOSE_PROJECT_NAME}"
+  for i in $(seq 1 40); do
+    if docker exec "$KEYCLOAK_CONTAINER" bash -c "exec 3<>/dev/tcp/localhost/8080" 2>/dev/null; then
+      echo "✅ Keycloak listo"
+      break
+    fi
+    echo "  intento $i/40..."
+    sleep 15
+  done
 
   echo "🚀 Ejecutando import de clientes..."
 
-  docker exec keycloak4${COMPOSE_PROJECT_NAME} bash -c "/scripts/import-keycloak-clients.sh"
+  docker exec -e KEYCLOAK_ISSUER="$OIDC_URL" keycloak4${COMPOSE_PROJECT_NAME} bash -c "/scripts/import-keycloak-clients.sh"
 
   echo "✅ Keycloak configurado"
 
