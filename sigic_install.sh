@@ -275,12 +275,12 @@ if echo "$PROFILES" | grep -q "oidc"; then
   # esperar a que keycloak esté listo (cold start puede tardar varios minutos)
   echo "⏳ Esperando Keycloak..."
   KEYCLOAK_CONTAINER="keycloak4${COMPOSE_PROJECT_NAME}"
-  for i in $(seq 1 40); do
+  for i in $(seq 1 60); do
     if docker exec "$KEYCLOAK_CONTAINER" bash -c "exec 3<>/dev/tcp/localhost/8080" 2>/dev/null; then
       echo "✅ Keycloak listo"
       break
     fi
-    echo "  intento $i/40..."
+    echo "  intento $i/60..."
     sleep 15
   done
 
