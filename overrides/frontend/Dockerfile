@@ -26,6 +26,9 @@ RUN npm install --include=dev
 
 COPY . .
 
+# Overlays de plataforma — sobreescriben archivos del código base sin modificar el submodulo
+COPY --from=platform_overrides . .
+
 RUN npm run build
 
 

@@ -187,8 +187,9 @@ if [ "$PLATFORM_MODE" = true ]; then
   sed -i 's/^DB_PORT=.*/DB_PORT=/' .env
   sed -i 's/^GEOSERVER_PORT=.*/GEOSERVER_PORT=/' .env
 
-  # escribir PLATFORM_HOST en .env para docker-compose.platform.yml
+  # escribir PLATFORM_HOST y PLATFORM_NAME en .env para docker-compose.platform.yml
   echo "PLATFORM_HOST=${HOSTNAME}" >> .env
+  echo "PLATFORM_NAME=${PLATFORM}" >> .env
 
   # guardar env de esta plataforma en su propio archivo
   cp .env "$ENV_ACTIVE"
