@@ -1,6 +1,7 @@
 # 🏗️ Build stage
 FROM node:22 AS builder
 
+ARG PLATFORM_NAME
 ARG NUXT_PUBLIC_APP_BASE_PATH
 
 ENV NUXT_PUBLIC_APP_BASE_PATH=${NUXT_PUBLIC_APP_BASE_PATH:-/}
@@ -16,14 +17,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
+COPY frontend/package*.json ./
 
 RUN npm install --include=dev
 
-COPY . .
+COPY frontend/ .
 
 # Overlays de plataforma — sobreescriben archivos del código base sin modificar el submodulo
-COPY --from=platform_overrides . .
+COPY platforms/${PLATFORM_NAME}/overrides/frontend/ .
 
 RUN npm run build
 
