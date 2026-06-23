@@ -333,6 +333,7 @@ services:
       - "3000"
     environment:
       NODE_ENV: production
+      NODE_OPTIONS: "--max-old-space-size=512"
       NUXT_PUBLIC_BASE_URL: ${NGINX_BASE_URL}
       NUXT_PUBLIC_GEONODE_URL: ${NGINX_BASE_URL}
       NUXT_PUBLIC_GEONODE_API: ${NGINX_BASE_URL}/api/v2
@@ -375,6 +376,7 @@ services:
       - "3000"
     environment:
       NODE_ENV: production
+      NODE_OPTIONS: "--max-old-space-size=512"
       NUXT_PUBLIC_BASE_URL: ${NGINX_BASE_URL}
       NUXT_PUBLIC_GEONODE_URL: ${NGINX_BASE_URL}
       NUXT_PUBLIC_GEONODE_API: ${NGINX_BASE_URL}/api/v2
