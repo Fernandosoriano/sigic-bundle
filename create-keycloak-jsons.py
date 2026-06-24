@@ -71,7 +71,7 @@ def validate_client(data, path):
         raise Exception(f"Errores en {path}:\n - " + "\n - ".join(errors))
 
 
-def process_file(path, values):
+def process_file(path, values, output_dir=None):
     with open(path) as f:
         content = f.read()
 
@@ -83,7 +83,12 @@ def process_file(path, values):
     # validar estructura
     validate_client(data, path)
 
-    out = path.replace(".template", "")
+    if output_dir:
+        filename = os.path.basename(path).replace(".template", "")
+        out = os.path.join(output_dir, filename)
+    else:
+        out = path.replace(".template", "")
+
     with open(out, "w") as f:
         json.dump(data, f, indent=2)
 
@@ -95,12 +100,16 @@ def main():
     env_path = os.path.join(base_dir, ".env")
     templates_dir = os.path.join(base_dir, "overrides", "keycloak")
 
+    output_dir = os.environ.get("KC_JSON_OUTPUT_DIR")
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     env = parse_env(env_path)
     values = build_replacements(env)
 
     for name in os.listdir(templates_dir):
         if name.endswith(".json.template"):
-            process_file(os.path.join(templates_dir, name), values)
+            process_file(os.path.join(templates_dir, name), values, output_dir)
 
 
 if __name__ == "__main__":

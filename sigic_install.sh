@@ -155,6 +155,10 @@ done
 # 🔹 ejecutar script real
 # =========================
 
+if [ "$PLATFORM_MODE" = true ]; then
+  export KC_JSON_OUTPUT_DIR="overrides/keycloak/${COMPOSE_PROJECT_NAME}"
+fi
+
 python3 create-envfile.py \
   --env_type="$ENV_TYPE" \
   --hostname="$HOSTNAME" \
@@ -190,9 +194,24 @@ if [ "$PLATFORM_MODE" = true ]; then
   # escribir PLATFORM_HOST y PLATFORM_NAME en .env para docker-compose.platform.yml
   echo "PLATFORM_HOST=${HOSTNAME}" >> .env
   echo "PLATFORM_NAME=${PLATFORM}" >> .env
+  echo "KEYCLOAK_IMPORT_SUBDIR=${COMPOSE_PROJECT_NAME}" >> .env
+
+  # en reinstall: preservar contraseñas de DB para no romper volúmenes existentes
+  if [ -f "$ENV_ACTIVE" ]; then
+    echo "🔒 Reinstall detectado — preservando contraseñas de DB existentes..."
+    for VAR in POSTGRES_PASSWORD GEOSERVER_ADMIN_PASSWORD ADMIN_PASSWORD; do
+      EXISTING=$(grep "^${VAR}=" "$ENV_ACTIVE" | cut -d= -f2)
+      if [ -n "$EXISTING" ]; then
+        sed -i "s/^${VAR}=.*/${VAR}=${EXISTING}/" .env
+      fi
+    done
+  fi
 
   # guardar env de esta plataforma en su propio archivo
   cp .env "$ENV_ACTIVE"
+
+  # garantizar que existe el directorio de overlays del frontend (puede estar vacío)
+  mkdir -p "platforms/${PLATFORM}/overrides/frontend"
 
   # crear red compartida si no existe
   docker network create sigic-proxy 2>/dev/null || true
@@ -277,8 +296,12 @@ if echo "$PROFILES" | grep -q "oidc"; then
   echo "⏳ Esperando Keycloak..."
   KEYCLOAK_CONTAINER="keycloak4${COMPOSE_PROJECT_NAME}"
   for i in $(seq 1 60); do
-    if docker exec "$KEYCLOAK_CONTAINER" bash -c "exec 3<>/dev/tcp/localhost/8080" 2>/dev/null; then
-      echo "✅ Keycloak listo"
+    if docker exec "$KEYCLOAK_CONTAINER" bash -c '
+      exec 3<>/dev/tcp/localhost/8080 2>/dev/null || exit 1
+      printf "GET /iam/realms/master HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3
+      timeout 5 cat <&3 2>/dev/null | grep -q "\"realm\""
+    ' 2>/dev/null; then
+      echo "✅ Keycloak listo (master realm inicializado)"
       break
     fi
     echo "  intento $i/60..."

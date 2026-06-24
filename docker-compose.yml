@@ -312,7 +312,7 @@ services:
       JGROUPS_DISCOVERY_PROPERTIES: "dns_query=localhost"
     volumes:
       - keycloak_data:/opt/keycloak/data
-      - ./overrides/keycloak:/opt/keycloak/data/import
+      - ./overrides/keycloak/${KEYCLOAK_IMPORT_SUBDIR:-.}:/opt/keycloak/data/import
       - ./scripts/import-keycloak-clients.sh:/scripts/import-keycloak-clients.sh:ro
     networks: [sigicnetwork]
 
