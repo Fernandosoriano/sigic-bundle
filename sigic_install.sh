@@ -168,6 +168,11 @@ python3 create-envfile.py \
   $FLAGS \
   $HTTPS_FLAG
 
+if [ "$PLATFORM_MODE" = true ]; then
+  cp overrides/keycloak/keycloak-realm-sigic.json \
+     "overrides/keycloak/${COMPOSE_PROJECT_NAME}/keycloak-realm-sigic.json"
+fi
+
 # =========================
 # 🔹 profiles
 # =========================
