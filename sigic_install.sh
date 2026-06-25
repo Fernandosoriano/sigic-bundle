@@ -332,14 +332,26 @@ if echo "$PROFILES" | grep -q "geonode"; then
 
   python3 create-socialaccount-fixture.py
 
-  echo "⏳ Esperando Django..."
-  sleep 20
+  echo "⏳ Esperando Django (migraciones pueden tardar varios minutos)..."
+  DJANGO_CONTAINER="django4${COMPOSE_PROJECT_NAME}"
+  ELAPSED=0
+  until [ "$(docker inspect --format='{{.State.Health.Status}}' "$DJANGO_CONTAINER" 2>/dev/null)" = "healthy" ]; do
+    echo "  esperando Django... (${ELAPSED}s)"
+    sleep 30
+    ELAPSED=$((ELAPSED + 30))
+    if [ $ELAPSED -ge 5400 ]; then
+      echo "⚠️  Django no quedó healthy después de 90 min — cargá el fixture manualmente:"
+      echo "    docker exec $DJANGO_CONTAINER bash -c 'python manage.py loaddata /usr/src/sigic_geonode/fixtures/socialaccount.json'"
+      break
+    fi
+  done
 
-  echo "🚀 Cargando fixture socialaccount..."
-
-  docker exec django4${COMPOSE_PROJECT_NAME} bash -c "python manage.py loaddata /usr/src/sigic_geonode/fixtures/socialaccount.json" || true
-
-  echo "✅ Fixture cargado"
+  if [ "$(docker inspect --format='{{.State.Health.Status}}' "$DJANGO_CONTAINER" 2>/dev/null)" = "healthy" ]; then
+    echo "✅ Django listo"
+    echo "🚀 Cargando fixture socialaccount..."
+    docker exec "$DJANGO_CONTAINER" bash -c "python manage.py loaddata /usr/src/sigic_geonode/fixtures/socialaccount.json" || true
+    echo "✅ Fixture cargado"
+  fi
 fi
 
 echo "🎉 SIGIC instalado con éxito!"
