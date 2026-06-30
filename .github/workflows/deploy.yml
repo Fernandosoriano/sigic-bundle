@@ -1,0 +1,82 @@
+name: Deploy Platform
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Plataforma'
+        type: choice
+        required: true
+        options:
+          - idegeo
+          - conafor
+          - sedema
+      environment:
+        description: 'Ambiente'
+        type: choice
+        required: true
+        options:
+          - dev
+          - qa
+          - prd
+
+# Evita deploys simultáneos al mismo stack
+concurrency:
+  group: deploy-${{ inputs.platform }}-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: ${{ inputs.platform }}-${{ inputs.environment }}
+    runs-on: [self-hosted, nimbus]
+    timeout-minutes: 90
+
+    steps:
+      - name: Verificar estado del repo
+        run: |
+          cd /opt/sigic-bundle
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "❌ Hay cambios sin commitear en /opt/sigic-bundle:"
+            git status --short
+            echo "Commitea o descarta los cambios antes de desplegar."
+            exit 1
+          fi
+
+      - name: Sync bundle
+        run: |
+          cd /opt/sigic-bundle
+          git fetch origin
+          git checkout ${{ github.ref_name }}
+          git pull origin ${{ github.ref_name }}
+          git submodule update --init --recursive
+
+      - name: Deploy
+        run: |
+          cd /opt/sigic-bundle
+          ./sigic_install.sh ${{ inputs.platform }} ${{ inputs.environment }}
+
+      - name: Verificar stack
+        run: |
+          PROJECT="${{ inputs.platform }}-${{ inputs.environment }}"
+          echo "📋 Estado del stack $PROJECT:"
+          docker ps -a --filter "label=com.docker.compose.project=$PROJECT" \
+            --format "table {{.Names}}\t{{.Status}}"
+
+          TOTAL=$(docker ps -a --filter "label=com.docker.compose.project=$PROJECT" -q | wc -l)
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "❌ No se encontraron contenedores para el proyecto $PROJECT"
+            echo "   Posible causa: COMPOSE_PROJECT_NAME no se fijó correctamente durante el install."
+            exit 1
+          fi
+
+          STOPPED=$(docker ps -a \
+            --filter "label=com.docker.compose.project=$PROJECT" \
+            --filter "status=exited" \
+            --format "{{.Names}}" | grep -v "init-" || true)
+
+          if [ -n "$STOPPED" ]; then
+            echo "❌ Contenedores detenidos inesperadamente:"
+            echo "$STOPPED"
+            exit 1
+          fi
+          echo "✅ Stack $PROJECT levantado correctamente ($TOTAL contenedores)"
