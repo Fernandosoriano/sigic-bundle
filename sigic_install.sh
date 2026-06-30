@@ -159,6 +159,9 @@ if [ "$PLATFORM_MODE" = true ]; then
   export KC_JSON_OUTPUT_DIR="overrides/keycloak/${COMPOSE_PROJECT_NAME}"
 fi
 
+NOINPUT_FLAG=""
+[ ! -t 0 ] && NOINPUT_FLAG="--noinput"
+
 python3 create-envfile.py \
   --env_type="$ENV_TYPE" \
   --hostname="$HOSTNAME" \
@@ -166,7 +169,8 @@ python3 create-envfile.py \
   --oidc_provider_url="$OIDC_URL" \
   --homepath="$HOMEPATH" \
   $FLAGS \
-  $HTTPS_FLAG
+  $HTTPS_FLAG \
+  $NOINPUT_FLAG
 
 if [ "$PLATFORM_MODE" = true ]; then
   cp overrides/keycloak/keycloak-realm-sigic.json \
