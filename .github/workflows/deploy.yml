@@ -35,9 +35,14 @@ jobs:
       - name: Verificar estado del repo
         run: |
           cd /opt/sigic-bundle
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "❌ Hay cambios sin commitear en /opt/sigic-bundle:"
-            git status --short
+          SUBMODULE_PATHS=$(git config --file .gitmodules --get-regexp 'submodule\..*\.path' | awk '{print $2}')
+          DIRTY=$(git status --porcelain | grep -v '^??' | while IFS= read -r line; do
+            FPATH=$(echo "$line" | awk '{print $NF}')
+            echo "$SUBMODULE_PATHS" | grep -qx "$FPATH" || echo "$line"
+          done)
+          if [ -n "$DIRTY" ]; then
+            echo "❌ Hay cambios sin commitear en archivos rastreados de /opt/sigic-bundle:"
+            echo "$DIRTY"
             echo "Commitea o descarta los cambios antes de desplegar."
             exit 1
           fi
