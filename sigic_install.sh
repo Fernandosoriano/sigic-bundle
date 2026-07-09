@@ -209,11 +209,25 @@ if [ "$PLATFORM_MODE" = true ]; then
   if [ -f "$ENV_ACTIVE" ]; then
     echo "🔒 Reinstall detectado — preservando contraseñas de DB existentes..."
     for VAR in POSTGRES_PASSWORD KC_DB_PASSWORD GEONODE_DATABASE_PASSWORD GEONODE_GEODATABASE_PASSWORD GEOSERVER_ADMIN_PASSWORD ADMIN_PASSWORD; do
-      EXISTING=$(grep "^${VAR}=" "$ENV_ACTIVE" | cut -d= -f2)
+      EXISTING=$(grep "^${VAR}=" "$ENV_ACTIVE" | cut -d= -f2-)
       if [ -n "$EXISTING" ]; then
-        sed -i "s/^${VAR}=.*/${VAR}=${EXISTING}/" .env
+        sed -i "s|^${VAR}=.*|${VAR}=${EXISTING}|" .env
       fi
     done
+    # Reconstruir URLs desde los passwords preservados para garantizar consistencia
+    # (create-envfile.py genera DATABASE_URL con password independiente de GEONODE_DATABASE_PASSWORD)
+    DB_USER=$(grep "^GEONODE_DATABASE_USER=" .env | cut -d= -f2)
+    DB_PASS=$(grep "^GEONODE_DATABASE_PASSWORD=" .env | cut -d= -f2)
+    DB_NAME=$(grep "^GEONODE_DATABASE=" .env | cut -d= -f2)
+    GEO_USER=$(grep "^GEONODE_GEODATABASE_USER=" .env | cut -d= -f2)
+    GEO_PASS=$(grep "^GEONODE_GEODATABASE_PASSWORD=" .env | cut -d= -f2)
+    GEO_NAME=$(grep "^GEONODE_GEODATABASE=" .env | cut -d= -f2)
+    if [ -n "$DB_USER" ] && [ -n "$DB_PASS" ] && [ -n "$DB_NAME" ]; then
+      sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgis://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}|" .env
+    fi
+    if [ -n "$GEO_USER" ] && [ -n "$GEO_PASS" ] && [ -n "$GEO_NAME" ]; then
+      sed -i "s|^GEODATABASE_URL=.*|GEODATABASE_URL=postgis://${GEO_USER}:${GEO_PASS}@db:5432/${GEO_NAME}|" .env
+    fi
   fi
 
   # guardar env de esta plataforma en su propio archivo
