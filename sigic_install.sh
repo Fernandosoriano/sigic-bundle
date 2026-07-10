@@ -372,5 +372,11 @@ if echo "$PROFILES" | grep -q "geonode"; then
   fi
 fi
 
+if [ "$PLATFORM_MODE" = true ]; then
+  # Segunda pasada: levantar contenedores que quedaron en Created por dependencia de Django
+  # (en fresh install, celery y geoserver fallan al arrancar porque Django aún no está healthy)
+  COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d || true
+fi
+
 echo "🎉 SIGIC instalado con éxito!"
 cat .env | grep -E '^(GEOSERVER_ADMIN_PASSWORD|ADMIN_PASSWORD)='

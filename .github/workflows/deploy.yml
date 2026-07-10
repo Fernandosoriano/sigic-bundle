@@ -1,5 +1,7 @@
 name: Deploy Platform
 
+# Trigger manual desde GitHub Actions UI.
+# Selecciona la plataforma (cliente) y el ambiente (dev/qa/prd) a desplegar.
 on:
   workflow_dispatch:
     inputs:
@@ -20,7 +22,9 @@ on:
           - qa
           - prd
 
-# Evita deploys simultáneos al mismo stack
+# Evita deploys simultáneos al mismo stack (platform+environment).
+# cancel-in-progress: false hace que el segundo deploy espere en cola
+# en lugar de cancelar el que está corriendo.
 concurrency:
   group: deploy-${{ inputs.platform }}-${{ inputs.environment }}
   cancel-in-progress: false
@@ -28,10 +32,14 @@ concurrency:
 jobs:
   deploy:
     name: ${{ inputs.platform }}-${{ inputs.environment }}
+    # Runner self-hosted en Nimbus (10.2.102.228), donde viven los stacks de dev y QA.
     runs-on: [self-hosted, nimbus]
+    # 90 min para absorber cold starts de Django (migraciones) y Keycloak.
     timeout-minutes: 90
 
     steps:
+      # Protege contra deploys que sobreescriban trabajo en progreso en el servidor.
+      # Falla si hay archivos rastreados modificados (excluye submodules).
       - name: Verificar estado del repo
         run: |
           cd /opt/sigic-bundle
@@ -47,6 +55,7 @@ jobs:
             exit 1
           fi
 
+      # Actualiza el bundle y submodules a la rama desde la que se disparó el workflow.
       - name: Sync bundle
         run: |
           cd /opt/sigic-bundle
@@ -55,11 +64,17 @@ jobs:
           git pull origin ${{ github.ref_name }}
           git submodule update --init --recursive
 
+      # Delega toda la lógica al script existente:
+      # genera .env, preserva passwords, levanta docker compose,
+      # importa Keycloak y carga fixtures de Django.
       - name: Deploy
         run: |
           cd /opt/sigic-bundle
           ./sigic_install.sh ${{ inputs.platform }} ${{ inputs.environment }}
 
+      # Valida que el stack quedó levantado correctamente:
+      # - Que existan contenedores para el proyecto
+      # - Que no haya contenedores detenidos (excluye init-* que terminan por diseño)
       - name: Verificar stack
         run: |
           PROJECT="${{ inputs.platform }}-${{ inputs.environment }}"
