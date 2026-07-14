@@ -281,6 +281,12 @@ NGINXEOF
   #   echo "🔒 Bloque SSL agregado al proxy config"
   # fi
 
+  # En fresh install las imágenes de frontend no existen localmente — construirlas antes del up
+  if ! docker image inspect "sigic-frontend-admin:${COMPOSE_PROJECT_NAME}" > /dev/null 2>&1; then
+    echo "🔨 Imágenes de frontend no encontradas — construyendo para ${COMPOSE_PROJECT_NAME}..."
+    COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml build frontend-admin frontend-app
+  fi
+
   COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" -f docker-compose.yml -f docker-compose.platform.yml up -d || true
 
   # reintentar si init-keycloak-db falla por race condition con PostgreSQL

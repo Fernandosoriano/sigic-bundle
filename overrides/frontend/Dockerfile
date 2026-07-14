@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY frontend/package*.json ./
 
-RUN npm install --include=dev
+RUN npm install --include=dev --legacy-peer-deps
 
 COPY frontend/ .
 
