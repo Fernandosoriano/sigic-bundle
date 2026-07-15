@@ -208,7 +208,7 @@ if [ "$PLATFORM_MODE" = true ]; then
   # en reinstall: preservar contraseñas de DB para no romper volúmenes existentes
   if [ -f "$ENV_ACTIVE" ]; then
     echo "🔒 Reinstall detectado — preservando contraseñas de DB existentes..."
-    for VAR in POSTGRES_PASSWORD KC_DB_PASSWORD GEONODE_DATABASE_PASSWORD GEONODE_GEODATABASE_PASSWORD GEOSERVER_ADMIN_PASSWORD ADMIN_PASSWORD; do
+    for VAR in POSTGRES_PASSWORD KC_DB_PASSWORD GEONODE_DATABASE_PASSWORD GEONODE_GEODATABASE_PASSWORD GEOSERVER_ADMIN_PASSWORD ADMIN_PASSWORD SECRET_KEY; do
       EXISTING=$(grep "^${VAR}=" "$ENV_ACTIVE" | cut -d= -f2-)
       if [ -n "$EXISTING" ]; then
         sed -i "s|^${VAR}=.*|${VAR}=${EXISTING}|" .env

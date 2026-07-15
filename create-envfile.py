@@ -49,6 +49,7 @@ _strong_chars = shuffle(
     string.ascii_letters
     + string.digits
     + string.punctuation.replace('"', "").replace("'", "").replace("`", "")
+    .replace("#", "").replace("\\", "").replace("$", "").replace("=", "")
 )
 
 
