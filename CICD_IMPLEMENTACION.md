@@ -274,11 +274,283 @@ Secuencia del deploy exitoso (sin intervención manual):
 
 ---
 
-## 4. Pendientes
+## 4. Pendientes (tras primer reinstall)
 
 | Ítem | Descripción | Prioridad |
 |------|-------------|-----------|
-| `geodata_conn.py` | Mover conexión psycopg2 fuera del nivel de módulo en `sigic-geonode-wrapper` | Media |
-| `vitest` ERESOLVE | `vitest@^4.0.17` incompatible con `@nuxt/test-utils@3.23.0` en `sigic-nuxt-frontend` — bloquea fresh installs del frontend | Media |
 | CI/CD auto en develop | Trigger automático en push a `develop` para despliegue a ambiente dev | Baja |
-| Fresh install test | Probar CI/CD con stack limpio (sin volúmenes existentes) | Baja |
+
+---
+
+## 5. Primer fresh install — `sedema-dev` (15 de julio de 2026)
+
+Tras el primer reinstall exitoso de `sedema-qa`, se probó el flujo de **fresh install** completo
+disparando CI/CD para `sedema-dev`, un ambiente que no existía previamente en Nimbus.
+
+### 5.1 Fix: `npm ERESOLVE` en build del frontend
+
+**Síntoma:** El build de la imagen `sigic-frontend-admin:sedema-dev` fallaba con:
+
+```
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error While resolving: @nuxt/test-utils@3.23.0
+npm error Found: vitest@4.1.2
+npm error peerOptional vitest@"^3.2.0" from @nuxt/test-utils@3.23.0
+```
+
+**Causa:** `vitest@4.1.2` (instalado como peer) no satisface el rango `^3.2.0` que requiere
+`@nuxt/test-utils@3.23.0`. El conflicto bloqueaba el `npm install` estricto.
+
+**Por qué no afectó a sedema-qa:** Las imágenes de sedema-qa se habían construido antes de que
+se introdujera la versión conflictiva de vitest, y quedaron cacheadas en Docker. En sedema-dev,
+al ser fresh install, no había caché y el build partía de cero.
+
+**Fix:** Agregar `--legacy-peer-deps` al `npm install` del Dockerfile del frontend:
+
+```dockerfile
+# overrides/frontend/Dockerfile
+RUN npm install --include=dev --legacy-peer-deps
+```
+
+Commit: `fix: --legacy-peer-deps en Dockerfile y pre-build de imágenes frontend en fresh install`
+
+---
+
+### 5.2 Fix: chars problemáticos en `SECRET_KEY`
+
+**Síntoma:** Django fallaba al iniciar con `unterminated quoted value` al leer `.env`. El
+`SECRET_KEY` generado contenía caracteres que rompen el parser de archivos `.env`:
+
+```
+SECRET_KEY=??gS*#/QJI)T]^T~}EbvN=q8rCym6VNwjY(biUA_G{WzLn@wl\
+```
+
+- `#` → interpretado como inicio de comentario
+- `\` al final de línea → interpretado como continuación de línea
+- `$` → interpolación de variable de shell
+- `=` → puede romper parsers de `.env` en ciertos contextos
+
+**Fix:** Eliminar esos caracteres del conjunto `_strong_chars` en `create-envfile.py`:
+
+```python
+_strong_chars = shuffle(
+    string.ascii_letters
+    + string.digits
+    + string.punctuation.replace('"', "").replace("'", "").replace("`", "")
+    .replace("#", "").replace("\\", "").replace("$", "").replace("=", "")
+)
+```
+
+**Fix adicional:** Agregar `SECRET_KEY` a la lista de variables preservadas en reinstalls dentro
+de `sigic_install.sh`, para que Django no reciba un `SECRET_KEY` distinto en cada deploy
+(lo cual invalida sesiones activas y cookies):
+
+```bash
+for VAR in POSTGRES_PASSWORD KC_DB_PASSWORD GEONODE_DATABASE_PASSWORD \
+           GEONODE_GEODATABASE_PASSWORD GEOSERVER_ADMIN_PASSWORD ADMIN_PASSWORD SECRET_KEY; do
+```
+
+Commit: `fix: preservar SECRET_KEY en reinstalls y eliminar chars problemáticos en passwords`
+
+---
+
+### 5.3 Fix: race condition en healthcheck de DB en fresh install
+
+**Síntoma:** En fresh install, `init-keycloak-db` terminaba con exit code != 0 porque
+PostgreSQL aún estaba inicializando la base de datos de Keycloak cuando el healthcheck
+(`pg_isready`) ya reportaba éxito. Esto dejaba `keycloak`, `django`, `celery` y `geoserver`
+en estado `Created` (nunca iniciados) porque sus dependencias de salud no se satisfacían.
+
+**Fix:** Añadir lógica de reintento para `init-keycloak-db` en `sigic_install.sh`:
+
+```bash
+INIT_CONTAINER="${COMPOSE_PROJECT_NAME}-init-keycloak-db-1"
+for attempt in 1 2 3; do
+  for i in $(seq 1 18); do
+    STATUS=$(docker inspect --format='{{.State.Status}}' "$INIT_CONTAINER" 2>/dev/null || echo "missing")
+    [ "$STATUS" = "exited" ] || [ "$STATUS" = "missing" ] && break
+    sleep 10
+  done
+  EXIT_CODE=$(docker inspect --format='{{.State.ExitCode}}' "$INIT_CONTAINER" 2>/dev/null || echo "0")
+  [ "$EXIT_CODE" = "0" ] && break
+  echo "⚠️  init-keycloak-db falló (intento $attempt/3) — reintentando en 20s..."
+  docker rm "$INIT_CONTAINER" 2>/dev/null || true
+  sleep 20
+  COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" \
+    -f docker-compose.yml -f docker-compose.platform.yml up -d || true
+done
+```
+
+---
+
+### 5.4 Fix: segunda pasada de `docker compose up` al final del script
+
+**Síntoma:** En fresh install, `celery` y `geoserver` quedaban en `Created` porque sus
+dependencias incluían `django` con condición `service_healthy`, y Django tardaba varios minutos
+en completar las migraciones. El script avanzaba antes de que Django estuviera healthy, así que
+esos servicios nunca arrancaban.
+
+**Fix:** Añadir una segunda llamada a `docker compose up -d` al final del script, después de
+que Django ya quedó healthy y se cargó el fixture:
+
+```bash
+if [ "$PLATFORM_MODE" = true ]; then
+  COMPOSE_PROFILES=$PROFILES docker compose --env-file "$ENV_ACTIVE" \
+    -f docker-compose.yml -f docker-compose.platform.yml up -d || true
+fi
+```
+
+---
+
+### 5.5 Fix: `externalhttps` en ambientes dev
+
+**Síntoma:** Los archivos `platforms/*/env/dev.env` tenían `https_mode=http`, pero el servidor
+Apache (`10.2.7.26`) termina TLS externamente y reenvía HTTP plano a nginx-proxy. Con `http`,
+el `SITEURL` generado era `http://...` y GeoNode rechazaba cookies seguras.
+
+**Fix:** Cambiar a `https_mode=externalhttps` en todos los `dev.env`:
+
+```
+# platforms/sedema/env/dev.env
+https_mode=externalhttps
+
+# platforms/idegeo/env/dev.env
+https_mode=externalhttps
+
+# platforms/conafor/env/dev.env
+https_mode=externalhttps
+```
+
+Commit: `fix: cambiar https_mode a externalhttps en ambientes dev de todas las plataformas`
+
+---
+
+### 5.6 Proxy conf huérfano bloqueaba reload de nginx-proxy
+
+**Síntoma:** Después de completar el setup manual de sedema-dev, `docker exec nginx-proxy nginx -s reload`
+fallaba con:
+
+```
+host not found in upstream "nginx4sedema-prd" in /etc/nginx/conf.d/sedema-prd.conf:8
+```
+
+**Causa:** Un archivo `proxy/conf.d/sedema-prd.conf` quedó de una instalación previa de `sedema-prd`
+que nunca se terminó de desplegar. nginx no permite recargar config con upstreams que no resuelven.
+
+**Fix:** Eliminar el archivo huérfano:
+
+```bash
+rm proxy/conf.d/sedema-prd.conf
+docker exec nginx-proxy nginx -s reload
+```
+
+**Lección:** `sigic_delete.sh` ya elimina `proxy/conf.d/<project>.conf` automáticamente (línea 53).
+El problema ocurrió porque `sedema-prd` se creó sin haberse dado de baja con `sigic_delete.sh`.
+Siempre usar ese script para teardown en lugar de bajar contenedores manualmente.
+
+---
+
+### 5.7 Estado final — sedema-dev operativo
+
+**Fecha:** 15 de julio de 2026  
+**Stack:** `sedema-dev`  
+**Tipo:** Fresh install (primer deploy)
+
+```
+✅ db4sedema-dev            → Healthy
+✅ django4sedema-dev        → Healthy (migraciones completas, ~20 min)
+✅ celery4sedema-dev        → Running
+✅ geoserver4sedema-dev     → Running
+✅ keycloak4sedema-dev      → Running
+✅ rabbitmq4sedema-dev      → Running
+✅ memcached4sedema-dev     → Healthy
+✅ frontendadmin4sedema-dev → Running
+✅ frontendapp4sedema-dev   → Running
+✅ nginx4sedema-dev         → Running
+✅ Keycloak: realm sedema + 3 clientes importados
+✅ Django fixture socialaccount → cargado
+✅ https://sedema-dev.geosuitemp.centrogeo.org.mx → accesible
+```
+
+---
+
+---
+
+## 6. Segundo deploy automatizado — `idegeo-dev` (20 de julio de 2026)
+
+Se disparó un nuevo deploy de `idegeo-dev` para validar que todos los fixes funcionan
+end-to-end sin intervención manual.
+
+### 6.1 Fix: SECRET_KEY con chars problemáticos (recurrente)
+
+En el primer intento del fresh install de `idegeo-dev`, el `.env.idegeo-dev` generado tenía
+un `SECRET_KEY` con `&`, `{`, `}`, `*`, `[`, `]` que rompían el parser de `docker compose --env-file`:
+
+```
+failed to read .env.idegeo-dev: line 204: unexpected character "&" in variable name
+```
+
+Nuestro fix anterior (eliminar `#`, `\`, `$`, `=` de `_strong_chars`) no era suficiente.
+
+**Fix definitivo:** Usar `secrets.token_urlsafe(50)` para generar el SECRET_KEY — produce
+solo letras, dígitos, `-` y `_`, completamente seguros en archivos `.env`:
+
+```python
+_vals_to_replace["secret_key"] = _jsfile.get(
+    "secret_key", args.secret_key
+) or secrets.token_urlsafe(50)
+```
+
+`secrets` ya estaba importado en el módulo (se usaba para `ia_django_secret_key`).
+
+Commit: `fix: usar token_urlsafe para SECRET_KEY y ampliar timeout de Keycloak a 30 min`
+
+---
+
+### 6.2 Fix: timeout de Keycloak insuficiente en fresh install
+
+**Síntoma:** En el fresh install, Keycloak tardó ~10 minutos solo en la fase de augmentation
+de Quarkus (`547236ms`). El script esperaba 60 intentos × 15s = **15 minutos**, lo cual
+no era suficiente margen.
+
+**Fix:** Aumentar el loop de espera de Keycloak a 120 intentos (30 minutos):
+
+```bash
+for i in $(seq 1 120); do
+```
+
+En reinstalls, Keycloak arranca en ~2 minutos porque la augmentation ya está cacheada.
+El timeout de 30 minutos solo importa en fresh installs.
+
+---
+
+### 6.3 Estado final — deploy automatizado exitoso
+
+**Fecha:** 20 de julio de 2026
+**Stack:** `idegeo-dev`
+**Tipo:** Reinstall (validación de fixes)
+
+```
+✅ 12 contenedores levantados sin intervención manual
+✅ Keycloak listo en ~2 minutos (reinstall con caché)
+✅ Keycloak: realm idegeo + 3 clientes importados automáticamente
+✅ Django fixture socialaccount cargado automáticamente
+✅ celery y geoserver levantados en segunda pasada
+✅ https://idegeo-dev.geosuitemp.centrogeo.org.mx accesible
+```
+
+| | Antes | Después |
+|--|-------|---------|
+| SECRET_KEY | Chars problemáticos rompen `.env` | `token_urlsafe` — siempre seguro |
+| Keycloak timeout | 15 min (insuficiente en fresh install) | 30 min |
+| Intervención manual | Necesaria | No requerida |
+
+---
+
+## 7. Pendientes actuales
+
+| Ítem | Descripción | Prioridad |
+|------|-------------|-----------|
+| CI/CD auto en develop | Trigger automático en push a `develop` para despliegue a ambiente dev | Baja |
+| `conafor-dev` | Verificar fresh install con todos los fixes aplicados | Baja |

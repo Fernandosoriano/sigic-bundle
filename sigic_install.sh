@@ -333,7 +333,7 @@ if echo "$PROFILES" | grep -q "oidc"; then
       echo "✅ Keycloak listo (master realm inicializado)"
       break
     fi
-    echo "  intento $i/60..."
+    echo "  intento $i/120..."
     sleep 15
   done
 
